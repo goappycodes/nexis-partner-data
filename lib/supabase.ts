@@ -2,27 +2,37 @@
 // bypasses RLS, so this module must never be imported into a client component.
 import 'server-only';
 
-const URL_BASE = process.env.SUPABASE_URL;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!URL_BASE || !SERVICE_KEY) {
-  throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set');
-}
-
 type Prefer = 'return=representation' | 'return=minimal';
+
+/**
+ * Read config per request rather than at module load. Next imports this module
+ * while collecting page data during `next build`, and a build machine has no
+ * reason to hold runtime secrets — throwing at import time turns a missing
+ * variable into a build failure instead of a clear error on the first request.
+ */
+function config() {
+  const urlBase = process.env.SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!urlBase || !serviceKey) {
+    throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set');
+  }
+  return { urlBase, serviceKey };
+}
 
 async function request<T>(
   pathAndQuery: string,
   init: { method: string; body?: unknown; prefer?: Prefer } = { method: 'GET' }
 ): Promise<T> {
+  const { urlBase, serviceKey } = config();
+
   const headers: Record<string, string> = {
-    apikey: SERVICE_KEY!,
-    Authorization: `Bearer ${SERVICE_KEY}`,
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
     'Content-Type': 'application/json',
   };
   if (init.prefer) headers.Prefer = init.prefer;
 
-  const res = await fetch(`${URL_BASE}/rest/v1/${pathAndQuery}`, {
+  const res = await fetch(`${urlBase}/rest/v1/${pathAndQuery}`, {
     method: init.method,
     headers,
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
