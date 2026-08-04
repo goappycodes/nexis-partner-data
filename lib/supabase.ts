@@ -2,7 +2,10 @@
 // bypasses RLS, so this module must never be imported into a client component.
 import 'server-only';
 
-type Prefer = 'return=representation' | 'return=minimal';
+type Prefer =
+  | 'return=representation'
+  | 'return=minimal'
+  | 'return=representation,resolution=merge-duplicates';
 
 /**
  * Read config per request rather than at module load. Next imports this module
@@ -50,6 +53,13 @@ export const db = {
   select: <T>(pathAndQuery: string) => request<T>(pathAndQuery),
   insert: <T>(table: string, body: unknown) =>
     request<T>(table, { method: 'POST', body, prefer: 'return=representation' }),
+  /** Insert, or update the row that clashes on a unique constraint. */
+  upsert: <T>(table: string, body: unknown) =>
+    request<T>(table, {
+      method: 'POST',
+      body,
+      prefer: 'return=representation,resolution=merge-duplicates',
+    }),
   update: <T>(pathAndQuery: string, body: unknown) =>
     request<T>(pathAndQuery, { method: 'PATCH', body, prefer: 'return=representation' }),
   remove: (pathAndQuery: string) =>
@@ -82,6 +92,21 @@ export type Comment = {
   body: string;
   created_at: string;
 };
+
+export type Campaign = { id: number; name: string; archived: boolean; created_at: string };
+
+export type CampaignContact = {
+  id: number;
+  campaign_id: number;
+  contact_id: number;
+  status: string;
+  poc: string;
+  notes: string;
+  updated_at: string;
+};
+
+/** Per-campaign fields a client may write. */
+export const CAMPAIGN_FIELDS = ['status', 'poc', 'notes'] as const;
 
 /** Columns a client is allowed to write. Anything else in a PATCH is ignored. */
 export const EDITABLE_COLUMNS = [

@@ -36,6 +36,29 @@ create table if not exists comments (
   created_at timestamptz not null default now()
 );
 
+-- An outreach round, e.g. "School workshops 2027".
+create table if not exists campaigns (
+  id         bigint generated always as identity primary key,
+  name       text not null unique,
+  archived   boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+-- One contact's state within one campaign. A row appears the first time
+-- something is recorded, so an untouched contact costs nothing.
+create table if not exists campaign_contacts (
+  id          bigint generated always as identity primary key,
+  campaign_id bigint not null references campaigns(id) on delete cascade,
+  contact_id  bigint not null references contacts(id)  on delete cascade,
+  status      text not null default '',
+  poc         text not null default '',
+  notes       text not null default '',
+  updated_at  timestamptz not null default now(),
+  unique (campaign_id, contact_id)
+);
+
+create index if not exists campaign_contacts_campaign_idx on campaign_contacts (campaign_id);
+
 create index if not exists comments_contact_id_idx on comments (contact_id, created_at desc);
 create index if not exists contacts_school_idx     on contacts (school);
 create index if not exists contacts_source_idx     on contacts (source);
@@ -54,12 +77,19 @@ create trigger contacts_set_updated_at
   before update on contacts
   for each row execute function set_updated_at();
 
+drop trigger if exists campaign_contacts_set_updated_at on campaign_contacts;
+create trigger campaign_contacts_set_updated_at
+  before update on campaign_contacts
+  for each row execute function set_updated_at();
+
 -- RLS on with no policies: the anon key can read/write nothing. The app talks
 -- to these tables only from the server using the service role key, which
 -- bypasses RLS.
-alter table contacts      enable row level security;
-alter table custom_fields enable row level security;
-alter table comments      enable row level security;
+alter table contacts          enable row level security;
+alter table custom_fields     enable row level security;
+alter table comments          enable row level security;
+alter table campaigns         enable row level security;
+alter table campaign_contacts enable row level security;
 `;
 
 const client = await connect();
@@ -69,7 +99,8 @@ try {
     `select table_name, (select count(*) from information_schema.columns c
        where c.table_name = t.table_name and c.table_schema = 'public') as columns
      from information_schema.tables t
-     where t.table_schema = 'public' and t.table_name in ('contacts','comments','custom_fields')
+     where t.table_schema = 'public'
+       and t.table_name in ('contacts','comments','custom_fields','campaigns','campaign_contacts')
      order by 1`
   );
   console.log('schema ready:');

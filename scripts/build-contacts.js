@@ -391,6 +391,75 @@ for (const c of contacts) {
   if (additions.length) c.Notes = [c.Notes, ...additions].filter(Boolean).join(' | ');
 }
 
+// ============ canonical school names ============
+
+// Cores that collide on two genuinely different schools. "Himalayan English
+// School" (Siliguri) and "Himalayan International Residential" (Rajganj) both
+// reduce to "himalayan" because the words that tell them apart are exactly the
+// generic ones the core strips, so this core is left alone.
+const AMBIGUOUS_SCHOOL_CORES = new Set(['himalayan']);
+
+const SCHOOL_STOP = new Set([
+  'school', 'schools', 'high', 'higher', 'secondary', 'public', 'academy',
+  'international', 'convent', 'residential', 'the', 'and', 'of', 'sr', 'jr',
+  'st', 'saint', 'dr', 'mission', 'memorial', 'group', 'institute', 'english',
+  'college', 'cbse',
+]);
+
+function schoolCore(name) {
+  return clean(name).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/)
+    .filter((w) => w && !SCHOOL_STOP.has(w)).join('');
+}
+
+const schoolVariants = new Map();
+for (const c of contacts) {
+  if (!c.School) continue;
+  const core = schoolCore(c.School);
+  if (!core || AMBIGUOUS_SCHOOL_CORES.has(core)) continue;
+  if (!schoolVariants.has(core)) schoolVariants.set(core, new Map());
+  const counts = schoolVariants.get(core);
+  counts.set(c.School, (counts.get(c.School) ?? 0) + 1);
+}
+
+/** Share of words that start with a capital — "Holy Child" scores 1, "Holy child" 0.5. */
+function caseQuality(name) {
+  const words = name.split(/\s+/).filter(Boolean);
+  if (!words.length) return 0;
+  return words.filter((w) => /^[A-Z0-9]/.test(w)).length / words.length;
+}
+
+/**
+ * A held shift key leaves "HIgh", "AShish". Two or more capitals followed by
+ * lower case is the giveaway; a fully capitalised acronym like "GD" or "DAV"
+ * has no trailing lower case and is left alone.
+ */
+const hasShiftTypo = (name) => name.split(/\s+/).some((w) => /^[A-Z]{2,}[a-z]/.test(w));
+
+const schoolCanonical = new Map();
+const schoolRenames = [];
+for (const [core, counts] of schoolVariants) {
+  if (counts.size < 2) continue;
+  // Tidiness before popularity: the most common spelling in these sheets is
+  // often the sloppiest ("Modi school", "St.James binnaguri"). Skip
+  // parenthetical asides like "(CBSE)", prefer properly capitalised names,
+  // and only then fall back to how often each spelling appears.
+  const best = [...counts.entries()].sort((a, b) =>
+    Number(a[0].includes('(')) - Number(b[0].includes('(')) ||
+    caseQuality(b[0]) - caseQuality(a[0]) ||
+    Number(hasShiftTypo(a[0])) - Number(hasShiftTypo(b[0])) ||
+    b[1] - a[1] ||
+    b[0].length - a[0].length
+  )[0][0];
+  schoolCanonical.set(core, best);
+  schoolRenames.push(`${best}  <-  ${[...counts.keys()].filter((v) => v !== best).join(', ')}`);
+}
+
+for (const c of contacts) {
+  const core = schoolCore(c.School);
+  const canonical = schoolCanonical.get(core);
+  if (canonical) c.School = canonical;
+}
+
 // ============ merge duplicates ============
 
 const HONORIFICS = /\b(sir|ma'?ams?|madam|mam|mr|mrs|ms|miss|dr|fr|sr|father|sister|rev|uncle|aunty|ji)\b\.?/gi;
@@ -439,18 +508,6 @@ contacts.forEach((c, i) => {
 // down slightly differently ("Priyanka Bose" at Mahbert vs "Priyanka Maam" at
 // Mahbert Siliguri). Matching is deliberately narrow: same first name, and one
 // school name a prefix of the other once generic words are dropped.
-const SCHOOL_STOP = new Set([
-  'school', 'schools', 'high', 'higher', 'secondary', 'public', 'academy',
-  'international', 'convent', 'residential', 'the', 'and', 'of', 'sr', 'jr',
-  'st', 'saint', 'dr', 'mission', 'memorial', 'group', 'institute', 'english',
-  'college', 'cbse',
-]);
-
-function schoolCore(name) {
-  return clean(name).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/)
-    .filter((w) => w && !SCHOOL_STOP.has(w)).join('');
-}
-
 function nameTokens(name) {
   return clean(name).toLowerCase().replace(HONORIFICS, '')
     .replace(/[^a-z ]/g, ' ').split(/\s+/).filter(Boolean);
@@ -611,6 +668,10 @@ fs.writeFileSync(OUT, lines.join('\r\n'), 'utf8');
 
 console.log(`Wrote ${contacts.length} contact rows to ${OUT}`);
 console.log(`Merged ${mergedAway} duplicate rows away`);
+if (schoolRenames.length) {
+  console.log(`\n${schoolRenames.length} school name(s) standardised:`);
+  for (const r of schoolRenames) console.log(`  ${r}`);
+}
 if (fuzzyMerges.length) {
   console.log(`\n${fuzzyMerges.length} merged on name + school rather than a shared number:`);
   for (const m of fuzzyMerges) console.log(`  ${m}`);

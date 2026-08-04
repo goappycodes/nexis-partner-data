@@ -234,6 +234,14 @@ td.col-open { width: 34px; }
 
 .empty { padding: 48px 16px; text-align: center; color: var(--text-muted); }
 
+/* Campaign columns are tinted so it stays obvious which values belong to the
+   selected campaign rather than to the contact itself. */
+.select-campaign { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+thead th.col-campaign { background: var(--accent-soft); color: var(--accent); }
+tbody td.col-campaign { background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface)); }
+tbody tr:hover td.col-campaign { background: var(--accent-soft); }
+
 /* ---------- drawer ---------- */
 
 .overlay {

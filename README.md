@@ -36,7 +36,12 @@ which sheet a row came from.
 - **Grid** — every contact, one row each. Click any cell to edit; it saves on blur
   or Enter, `Esc` cancels. Click a column header to sort.
 - **Search and filters** — free-text search covers every field including notes;
-  dropdowns narrow by location and source.
+  dropdowns narrow by location, source, and whether a phone number is missing.
+- **Campaigns** — pick a campaign (or create one) from the tinted dropdown and
+  three extra columns appear: outreach status, POC and notes, recorded against
+  that campaign only. The same contact can be tracked separately across as many
+  campaigns as you like; switching campaign swaps the values, and choosing
+  "No campaign" hides the columns.
 - **Detail drawer** — the `›` button opens a row for full editing, including the
   long `Notes` field, plus its comment thread. The badge on `›` counts comments.
 - **Comments** — threaded per contact, with an author name remembered between posts.
@@ -51,9 +56,11 @@ which sheet a row came from.
 | `contacts` | One row per person. Fixed text columns plus a `custom` jsonb bag. |
 | `custom_fields` | Definitions for user-added columns (`key`, `label`, `position`). |
 | `comments` | Free-text notes against a contact, cascade-deleted with it. |
+| `campaigns` | An outreach round, e.g. "School workshops 2027". |
+| `campaign_contacts` | One contact's status/POC/notes within one campaign, unique on the pair. Rows are created on first write, so untouched contacts cost nothing. |
 
-RLS is enabled on all three with **no policies**, so the anon key can read and write
-nothing. The app reaches the database only from server-side route handlers using the
+RLS is enabled on all of them with **no policies**, so the anon key can read and
+write nothing. The app reaches the database only from server-side route handlers using the
 service role key, gated by the session cookie.
 
 ## Auth

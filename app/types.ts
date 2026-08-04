@@ -25,6 +25,19 @@ export type Comment = {
   created_at: string;
 };
 
+export type Campaign = { id: number; name: string; archived: boolean; created_at: string };
+
+/** A contact's outreach state within one campaign. */
+export type CampaignEntry = { status: string; poc: string; notes: string };
+
+export const EMPTY_CAMPAIGN_ENTRY: CampaignEntry = { status: '', poc: '', notes: '' };
+
+export const CAMPAIGN_COLUMNS = [
+  { key: 'status', label: 'Outreach' },
+  { key: 'poc', label: 'Campaign POC' },
+  { key: 'notes', label: 'Campaign notes' },
+] as const;
+
 /** Columns shown in the grid, in order. Notes and Source live in the drawer. */
 export const GRID_COLUMNS = [
   { key: 'school', label: 'School' },

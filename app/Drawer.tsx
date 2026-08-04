@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import EditableCell from './EditableCell';
-import { ALL_COLUMNS, type Comment, type Contact, type CustomField } from './types';
+import {
+  ALL_COLUMNS, CAMPAIGN_COLUMNS, EMPTY_CAMPAIGN_ENTRY,
+  type Campaign, type CampaignEntry, type Comment, type Contact, type CustomField,
+} from './types';
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString(undefined, {
@@ -17,6 +20,9 @@ function formatDate(iso: string) {
 export default function Drawer({
   contact,
   fields,
+  campaign,
+  entry,
+  onCampaignPatch,
   onClose,
   onPatch,
   onDelete,
@@ -24,6 +30,9 @@ export default function Drawer({
 }: {
   contact: Contact;
   fields: CustomField[];
+  campaign: Campaign | null;
+  entry: CampaignEntry;
+  onCampaignPatch: (contactId: number, field: keyof CampaignEntry, value: string) => void;
   onClose: () => void;
   onPatch: (id: number, patch: Record<string, unknown>) => void;
   onDelete: (id: number) => void;
@@ -122,6 +131,37 @@ export default function Drawer({
               }}
             />
           </div>
+
+          {campaign && (
+            <>
+              <div className="section-title">Campaign — {campaign.name}</div>
+              {CAMPAIGN_COLUMNS.map(({ key, label }) => (
+                <div className="field" key={key}>
+                  <label>{label}</label>
+                  {key === 'notes' ? (
+                    <textarea
+                      rows={3}
+                      key={`camp-notes-${contact.id}-${campaign.id}`}
+                      defaultValue={entry.notes}
+                      onBlur={(e) => {
+                        if (e.target.value !== entry.notes) {
+                          onCampaignPatch(contact.id, 'notes', e.target.value);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <EditableCell
+                      className=""
+                      value={entry[key as keyof CampaignEntry] ?? ''}
+                      onCommit={(next) =>
+                        onCampaignPatch(contact.id, key as keyof CampaignEntry, next)
+                      }
+                    />
+                  )}
+                </div>
+              ))}
+            </>
+          )}
 
           {fields.length > 0 && (
             <>
